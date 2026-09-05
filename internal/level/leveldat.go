@@ -82,28 +82,35 @@ type Info struct {
 	InventoryVersion               string  `json:"inventory_version,omitempty"`
 	LastOpenedWithVersion          []int32 `json:"last_opened_with_version,omitempty"`
 	MinimumCompatibleClientVersion string  `json:"minimum_compatible_client_version,omitempty"`
-	LastPlayed                     int64   `json:"last_played_ms"` // Unix 毫秒
-	GameType                       int32   `json:"game_type"`      // 0 生存 1 创造 2 冒险
-	Difficulty                     int32   `json:"difficulty"`     // 0 和平 1 简单 2 普通 3 困难
-	Generator                      int32   `json:"generator"`      // 0 旧世界 1 无限 2 扁平
-	RandomSeed                     int64   `json:"random_seed"`
-	SpawnX                         int32   `json:"spawn_x"`
-	SpawnY                         int32   `json:"spawn_y"`
-	SpawnZ                         int32   `json:"spawn_z"`
-	Time                           int64   `json:"time"` // 世界游戏内时间（tick）
-	StorageVersion                 uint32  `json:"storage_version"`
-	CommandsEnabled                bool    `json:"commands_enabled"`
+	// LastPlayed 为最后游玩时间的 Unix 毫秒时间戳。
+	// 部分网易版本以秒存储该字段，解析时按 <1e12 启发式归一化为毫秒。
+	LastPlayed      int64  `json:"last_played_ms"` // Unix 毫秒
+	GameType        int32  `json:"game_type"`      // 0 生存 1 创造 2 冒险
+	Difficulty      int32  `json:"difficulty"`     // 0 和平 1 简单 2 普通 3 困难
+	Generator       int32  `json:"generator"`      // 0 旧世界 1 无限 2 扁平
+	RandomSeed      int64  `json:"random_seed"`
+	SpawnX          int32  `json:"spawn_x"`
+	SpawnY          int32  `json:"spawn_y"`
+	SpawnZ          int32  `json:"spawn_z"`
+	Time            int64  `json:"time"` // 世界游戏内时间（tick）
+	StorageVersion  uint32 `json:"storage_version"`
+	CommandsEnabled bool   `json:"commands_enabled"`
 }
 
 // Info 从已解析的 level.dat 提取世界基本信息。
 func (l *LevelDat) Info() Info {
+	lastPlayed := l.getInt64("LastPlayed")
+	if lastPlayed > 0 && lastPlayed < 1e12 {
+		// 该值为 Unix 秒（部分网易版本如此），归一化为毫秒
+		lastPlayed *= 1000
+	}
 	return Info{
 		LevelName:                      l.getString("LevelName"),
 		EngineVersion:                  l.EngineVersion(),
 		InventoryVersion:               l.getString("InventoryVersion"),
 		LastOpenedWithVersion:          l.IntList("lastOpenedWithVersion"),
 		MinimumCompatibleClientVersion: FormatVersionArray(l.IntList("minimumCompatibleClientVersion")),
-		LastPlayed:                     l.getInt64("LastPlayed"),
+		LastPlayed:                     lastPlayed,
 		GameType:                       l.getInt32("GameType"),
 		Difficulty:                     l.getInt32("Difficulty"),
 		Generator:                      l.getInt32("Generator"),

@@ -277,17 +277,17 @@ func ManifestNames(entries []Entry, dbPrefix string) []string {
 
 // WorldStats 为只读检查得到的存档概况。
 type WorldStats struct {
-	Kind         string   // zip / dir
-	DBPrefix     string   // db 目录前缀（"" 表示根）
-	WorldRoot    string   // 世界根目录前缀（"" 表示根）
-	FileCount    int      // 文件条目数
-	DirCount     int      // 目录条目数
-	TotalSize    int64    // 文件总字节数
-	LevelDatPath string   // level.dat 的条目路径（"" 表示未找到）
-	LevelNameTxt string   // levelname.txt 内容（去首尾空白），"" 表示不存在
-	DBFiles      int      // db 内文件数
-	EncryptedDB  []string // db 内带现行加密魔数的文件
-	EncryptedOld []string // db 内带旧版魔数的文件
+	Kind         string   `json:"kind"`                    // zip / dir
+	DBPrefix     string   `json:"db_prefix"`               // db 目录前缀（"" 表示根）
+	WorldRoot    string   `json:"world_root"`              // 世界根目录前缀（"" 表示根）
+	FileCount    int      `json:"file_count"`              // 文件条目数
+	DirCount     int      `json:"dir_count"`               // 目录条目数
+	TotalSize    int64    `json:"total_size"`              // 文件总字节数
+	LevelDatPath string   `json:"level_dat_path"`          // level.dat 的条目路径（"" 表示未找到）
+	LevelNameTxt string   `json:"levelname_txt,omitempty"` // levelname.txt 内容（去首尾空白）
+	DBFiles      int      `json:"db_files"`                // db 内文件数
+	EncryptedDB  []string `json:"encrypted_db,omitempty"`  // db 内带现行加密魔数的文件
+	EncryptedOld []string `json:"encrypted_old,omitempty"` // db 内带旧版魔数的文件
 }
 
 // Inspect 只读扫描存档，收集统计信息（不产生输出）。
@@ -386,7 +386,8 @@ type Result struct {
 	Transformed []string
 	Copied      int
 	Skipped     []string // 加密模式下跳过的已加密文件
-	Notes       []string // 软性提示（如 MANIFEST 校验信息）
+	Verified    string   // 解密模式的正向校验结论
+	Notes       []string // 软性警告（如 MANIFEST 缺少比较器字符串）
 }
 
 // Transform 把 store 的全部条目流式写入 sink，按模式解密或加密 db 内文件。
@@ -462,8 +463,10 @@ func Transform(store Store, sink Sink, opts Options) (*Result, error) {
 		}
 	}
 
-	// 解密后对 MANIFEST 做软校验：标准 LevelDB 清单中应含比较器名字符串
+	// 解密后：CURRENT 已知明文校验在此处必然已通过（推导或指定密钥时均已验证），
+	// 再对 MANIFEST 做软校验：标准 LevelDB 清单中应含比较器名字符串
 	if opts.Mode == ModeDecrypt {
+		res.Verified = fmt.Sprintf("CURRENT 明文校验通过（%s）", manifestName)
 		manPath := joinName(dbPrefix, manifestName)
 		if manRaw, err := store.ReadAll(manPath); err == nil && crypt.IsEncrypted(manRaw) {
 			plain := crypt.XOR(manRaw[4:], res.Key)
@@ -568,4 +571,53 @@ func joinName(prefix, name string) string {
 		return name
 	}
 	return prefix + "/" + name
+}
+
+// FindLevelDat 在存档中定位层级最浅的 level.dat 并读取其内容。
+// 不要求存档含 db 目录（对已解密与未解密存档均适用）。
+func FindLevelDat(store Store) (string, []byte, error) {
+	entries, err := store.Entries()
+	if err != nil {
+		return "", nil, err
+	}
+	best := ""
+	bestDepth := -1
+	for _, e := range entries {
+		if e.IsDir || path.Base(e.Name) != "level.dat" {
+			continue
+		}
+		d := len(strings.Split(e.Name, "/"))
+		if bestDepth < 0 || d < bestDepth {
+			best, bestDepth = e.Name, d
+		}
+	}
+	if best == "" {
+		return "", nil, fmt.Errorf("存档中找不到 level.dat")
+	}
+	data, err := store.ReadAll(best)
+	if err != nil {
+		return "", nil, err
+	}
+	return best, data, nil
+}
+
+// DeriveKey 从存档 db 的 CURRENT + MANIFEST 推导密钥（只读，不写出）。
+func DeriveKey(store Store) ([]byte, error) {
+	entries, err := store.Entries()
+	if err != nil {
+		return nil, err
+	}
+	dbPrefix, err := LocateDB(entries)
+	if err != nil {
+		return nil, err
+	}
+	manifestName, err := crypt.PickManifest(ManifestNames(entries, dbPrefix))
+	if err != nil {
+		return nil, err
+	}
+	currentRaw, err := store.ReadAll(joinName(dbPrefix, "CURRENT"))
+	if err != nil {
+		return nil, err
+	}
+	return crypt.DeriveKey(currentRaw, manifestName)
 }
