@@ -82,6 +82,18 @@ func runTransform(cmd *cobra.Command, input, output, keyFlag string, overwrite b
 	if err != nil {
 		return err
 	}
+	// 输出不能指向输入自身：zip 会在打开状态下被截断，目录形态则可能连带删除源存档
+	inAbs, err := filepath.Abs(input)
+	if err != nil {
+		return err
+	}
+	outAbs, err := filepath.Abs(outPath)
+	if err != nil {
+		return err
+	}
+	if filepath.Clean(inAbs) == filepath.Clean(outAbs) {
+		return &UsageError{fmt.Errorf("输出路径不能与输入相同: %s", outPath)}
+	}
 	if _, err := os.Stat(outPath); err == nil {
 		if !overwrite {
 			return fmt.Errorf("输出已存在: %s（--overwrite 可覆盖）", outPath)

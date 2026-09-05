@@ -74,6 +74,8 @@ nmcat encrypt 存档.zip --overwrite          # 输出已存在时覆盖
 nmcat version 存档目录/ --json              # 机器可读输出
 ```
 
+**目录与 zip 自动识别**：所有命令的输入既可以是 zip 压缩包，也可以直接是世界目录（游戏在设备上本就以目录形态存放，如 `…/minecraftWorlds/ESfjmffkJN0=`）。识别依据是内容而非扩展名：目录 → 按目录读取，文件头为 `PK` 魔数 → 按 zip 读取。目录输入默认输出到同级的 `<目录名>_decrypted` / `_encrypted`，同样不改动输入；输出路径与输入相同时会直接拒绝，避免误删源存档。
+
 ## 加密机制速查
 
 | 项 | 值 |

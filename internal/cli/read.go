@@ -197,7 +197,8 @@ func printJSON(cmd *cobra.Command, v any) error {
 }
 
 func worldName(store archive.Store, st *archive.WorldStats, input string) string {
-	if st.WorldRoot != "" {
+	// WorldRoot 为 "." 表示世界就在存档根目录，回退到输入路径推断名称
+	if st.WorldRoot != "" && st.WorldRoot != "." {
 		return strings.Split(st.WorldRoot, "/")[0]
 	}
 	if store.Kind() == "dir" {

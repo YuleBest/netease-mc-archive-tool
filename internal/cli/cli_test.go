@@ -132,3 +132,73 @@ func TestDecrypt_WrongKeyFails(t *testing.T) {
 		t.Fatal("错误密钥应失败")
 	}
 }
+
+// TestDecrypt_DirInput 验证目录形态输入（游戏原生存储形态）：
+// 解压存档 zip 为目录后直接对其解密，世界名应取输入目录名。
+func TestDecrypt_DirInput(t *testing.T) {
+	testArchiveAvailable(t)
+	tmp := t.TempDir()
+
+	// 解压
+	zr, err := zip.OpenReader(testArchive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer zr.Close()
+	for _, f := range zr.File {
+		p := filepath.Join(tmp, f.Name)
+		if f.FileInfo().IsDir() {
+			if err := os.MkdirAll(p, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		r, err := f.Open()
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := io.ReadAll(r)
+		r.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	worldDir := filepath.Join(tmp, "ESfjmffkJN0=")
+	out := runCmd(t, "decrypt", worldDir)
+	if !strings.Contains(out, "(dir)") || !strings.Contains(out, "88329851") {
+		t.Fatalf("目录解密输出异常:\n%s", out)
+	}
+
+	// 目录形态下 version / info 同样可用
+	if out := runCmd(t, "version", filepath.Join(tmp, "ESfjmffkJN0=_decrypted")); !strings.Contains(out, "1.21.120") {
+		t.Fatalf("目录形态 version 输出异常:\n%s", out)
+	}
+	out = runCmd(t, "info", filepath.Join(tmp, "ESfjmffkJN0=_decrypted"))
+	if !strings.Contains(out, "世界:            ESfjmffkJN0=") {
+		t.Fatalf("目录形态 info 世界名错误:\n%s", out)
+	}
+	if !strings.Contains(out, "未加密") {
+		t.Fatalf("目录形态 info 应显示 db 未加密:\n%s", out)
+	}
+}
+
+// TestTransform_SameInputOutputRejected 输出与输入同一路径必须被拒绝
+// （否则 --overwrite 会在打开 zip 的同时截断/删除源存档）。
+func TestTransform_SameInputOutputRejected(t *testing.T) {
+	testArchiveAvailable(t)
+	var out bytes.Buffer
+	cmd := NewRootCmd()
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"decrypt", testArchive, "-o", testArchive, "--overwrite"})
+	if err := cmd.Execute(); err == nil {
+		t.Fatal("输出与输入相同应报错")
+	}
+}
