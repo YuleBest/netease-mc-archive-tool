@@ -1,5 +1,7 @@
 # nmcat · netease-mc-archive-tool
 
+[![Release](https://github.com/YuleBest/netease-mc-archive-tool/actions/workflows/release.yml/badge.svg)](https://github.com/YuleBest/netease-mc-archive-tool/actions/workflows/release.yml)
+
 网易我的世界（中国版）基岩存档命令行工具，使用 Go 实现。
 
 > 解密 / 加密网易加密存档，读取 MC（基岩引擎）真实版本号与世界基本信息。
@@ -19,7 +21,10 @@
 
 ## 安装
 
+下载预编译版本（推荐）：从 [Releases](https://github.com/YuleBest/netease-mc-archive-tool/releases) 获取对应平台的压缩包——由 GitHub Actions 在推送 `v*` 标签时通过 GoReleaser 自动构建并发布，覆盖 Windows（zip）/ Linux / macOS（tar.gz）/ Android（Termux 可直接运行，arm64）。
+
 ```sh
+# 或用 go install：
 go install github.com/YuleBest/netease-mc-archive-tool/cmd/nmcat@latest
 # 或从源码构建：
 git clone https://github.com/YuleBest/netease-mc-archive-tool

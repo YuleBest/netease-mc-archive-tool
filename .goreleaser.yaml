@@ -1,0 +1,62 @@
+version: 2
+
+project_name: nmcat
+
+builds:
+  - id: nmcat
+    main: ./cmd/nmcat
+    binary: nmcat
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+      - android
+    goarch:
+      - amd64
+      - arm64
+      - arm
+      - 386
+    ignore:
+      # darwin 不支持 386/arm；windows 与 android 的 arm(32)/386 组合无实际用户
+      - goos: darwin
+        goarch: 386
+      - goos: darwin
+        goarch: arm
+      - goos: windows
+        goarch: arm
+      - goos: android
+        goarch: 386
+      - goos: android
+        goarch: amd64
+      # android/arm(32) 需要 cgo + NDK 外部链接，放弃；arm64 覆盖现代设备
+      - goos: android
+        goarch: arm
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - id: default
+    formats: [tar.gz]
+    name_template: >-
+      nmcat_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+      {{- with .Arm }}v{{ . }}{{ end -}}
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  use: git
+  sort: asc
+  filters:
+    exclude:
+      - "^chore:"
+      - "^test:"
+
+release:
+  draft: false
+  prerelease: auto
