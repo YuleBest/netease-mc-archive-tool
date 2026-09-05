@@ -10,8 +10,8 @@ testdata/*.zip
 *_decrypted/
 *_encrypted/
 
-# Go 构建产物
-nmcat
+# Go 构建产物（仅根目录二进制；注意不要写成裸 nmcat，否则会误伤 cmd/nmcat/ 源码目录）
+/nmcat
 dist/
 *.test
 
