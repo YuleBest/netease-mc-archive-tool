@@ -227,29 +227,31 @@ db/MANIFEST-000006  →  已知明文 "MANIFEST-000006\n"
 
 ```console
 $ nmcat decrypt testdata/ESfjmffkJN0=.zip
-[i] 定位到 db 目录: ESfjmffkJN0=/db
-[i] db 内加密文件 2 个: ['CURRENT', 'MANIFEST-000006']
-[i] 从 CURRENT+MANIFEST 推导出密钥: hex=3838333239383531 ascii=b'88329851'  （即官方默认密钥 88329851）
-[i] 实际解密 2 个文件
-[✓] CURRENT 明文 = 'MANIFEST-000006'（与 MANIFEST 文件名一致）
-[✓] MANIFEST: 2/2 条 VersionEdit 记录 CRC 校验通过，比较器字符串存在=True
-[✓] MANIFEST 中找到 'leveldb.BytewiseComparator' —— 解密结果为合法 LevelDB 元数据
-[i] ESfjmffkJN0=/db/000007.log: 本身未加密（明文 WAL），31/31 条记录 CRC 校验通过
-[i] 已写出: ESfjmffkJN0=_decrypted.zip (10 个文件)
+[i] 输入:      testdata/ESfjmffkJN0=.zip (zip)
+[i] db 目录:   ESfjmffkJN0=/db
+[i] 密钥:      88329851（hex 3838333239383531，来源: 自动推导）
+[i] 已解密: 2 个文件: CURRENT, MANIFEST-000006
+[✓] 校验:     CURRENT 明文校验通过（MANIFEST-000006）
+[✓] 已写出:   testdata/ESfjmffkJN0=_decrypted.zip（10 个条目）
 ```
 
-脚本内置了四重独立校验，不依赖“打开游戏看效果”：
+工具与测试内置了多重独立校验，不依赖“打开游戏看效果”：
 
 1. **密钥自检**：keystream 前 8 字节与后 8 字节必须相同（§5）；
-2. **CURRENT 已知明文**：解密结果必须逐字节等于 `MANIFEST-000006\n`；
-3. **LevelDB 记录 CRC**：对解密后的 `MANIFEST` 用 CRC32C（Castagnoli，含 LevelDB 的 mask 变换）逐条校验 log 记录帧，2/2 全过，且明文中出现 `leveldb.BytewiseComparator`；对明文 WAL `000007.log` 校验 31/31 全过（证明未加密文件未被破坏、整个数据库自洽）；
-4. **往返一致性**：把解密结果再加密，与原始加密存档做逐文件字节比对：
+2. **CURRENT 已知明文**：解密结果必须逐字节等于 `MANIFEST-000006\n`（推导密钥时天然满足，指定密钥时用于拦截错误密钥）；
+3. **MANIFEST 软校验**：解密结果应含 `leveldb.BytewiseComparator`；
+4. **往返一致性**（`go test ./...` 集成测试内置）：把解密结果再加密，与原始加密存档做逐条目 SHA-256 比对：
 
 ```console
-$ nmcat encrypt ESfjmffkJN0=_decrypted.zip --output /tmp/re.zip
-原始加密存档 与 「解密→再加密」结果 文件集一致: True
-字节级完全一致: True
+$ nmcat encrypt testdata/ESfjmffkJN0=_decrypted.zip -o /tmp/re.zip
+[i] 输入:      testdata/ESfjmffkJN0=_decrypted.zip (zip)
+[i] db 目录:   ESfjmffkJN0=/db
+[i] 密钥:      88329851（hex 3838333239383531，来源: 官方默认）
+[i] 已加密: 2 个文件: CURRENT, MANIFEST-000006
+[✓] 已写出:   /tmp/re.zip（10 个条目）
 ```
+
+研究阶段另用独立 Python 脚本做过更深的验证（此处记录结论）：解密后的 MANIFEST 以 CRC32C（Castagnoli，含 LevelDB mask 变换）逐条校验 log 记录帧 2/2 全过；明文 WAL `000007.log` 31/31 条记录 CRC 全过——证明解密结果与未加密文件整体自洽。
 
 以上结果均可重复：构建 nmcat（`go build ./cmd/nmcat`）后对 [`testdata/ESfjmffkJN0=.zip`](../testdata/) 依次执行上面两条命令，并比对两个 zip 的逐条目字节即可。
 
