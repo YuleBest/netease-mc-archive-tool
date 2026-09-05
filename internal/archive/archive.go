@@ -621,3 +621,43 @@ func DeriveKey(store Store) ([]byte, error) {
 	}
 	return crypt.DeriveKey(currentRaw, manifestName)
 }
+
+// StripWorldRoot 返回剥离世界根目录前缀后的 Store 视图：世界内容置于（虚拟）存档根。
+// 用于导出 .mcworld——其格式要求 level.dat 等文件位于压缩包根，而非嵌套在世界目录内。
+// worldRoot 为 "" 或 "." 时原样返回。世界子树之外的条目会被过滤掉。
+func StripWorldRoot(store Store, worldRoot string) (Store, error) {
+	if worldRoot == "" || worldRoot == "." {
+		return store, nil
+	}
+	return &strippedStore{Store: store, prefix: worldRoot + "/"}, nil
+}
+
+type strippedStore struct {
+	Store
+	prefix string
+}
+
+func (s *strippedStore) Entries() ([]Entry, error) {
+	es, err := s.Store.Entries()
+	if err != nil {
+		return nil, err
+	}
+	var out []Entry
+	for _, e := range es {
+		if !strings.HasPrefix(e.Name, s.prefix) {
+			continue
+		}
+		e.Name = strings.TrimPrefix(e.Name, s.prefix)
+		out = append(out, e)
+	}
+	sortEntries(out)
+	return out, nil
+}
+
+func (s *strippedStore) Open(name string) (io.ReadCloser, error) {
+	return s.Store.Open(s.prefix + name)
+}
+
+func (s *strippedStore) ReadAll(name string) ([]byte, error) {
+	return s.Store.ReadAll(s.prefix + name)
+}

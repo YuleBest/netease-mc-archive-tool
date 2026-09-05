@@ -202,3 +202,78 @@ func TestTransform_SameInputOutputRejected(t *testing.T) {
 		t.Fatal("输出与输入相同应报错")
 	}
 }
+
+// TestExport_RealArchive 验证 export 命令：解密 + 世界内容提升到压缩包根。
+func TestExport_RealArchive(t *testing.T) {
+	testArchiveAvailable(t)
+	tmp := t.TempDir()
+	out := filepath.Join(tmp, "world.mcworld")
+	runCmd(t, "export", testArchive, "-o", out)
+
+	zr, err := zip.OpenReader(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer zr.Close()
+	rootLevelDat := false
+	var current []byte
+	for _, f := range zr.File {
+		switch f.Name {
+		case "level.dat":
+			rootLevelDat = true
+		case "db/CURRENT":
+			r, err := f.Open()
+			if err != nil {
+				t.Fatal(err)
+			}
+			data, err := io.ReadAll(r)
+			r.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+			current = data
+		case strings.TrimSuffix(filepath.Base(testArchive), ".zip") + "/level.dat":
+			t.Fatal("世界内容不应嵌套在子目录内")
+		}
+	}
+	if !rootLevelDat {
+		t.Fatal("level.dat 应位于压缩包根")
+	}
+	if string(current) != "MANIFEST-000006\n" {
+		t.Fatalf("db/CURRENT 应为明文已知格式: %q", current)
+	}
+
+	// 导出的 .mcworld 可直接被 info/version 读取（世界位于压缩包根）
+	if out := runCmd(t, "info", out); !strings.Contains(out, "1.21.120") || !strings.Contains(out, "我的世界") {
+		t.Fatalf("info 读取 .mcworld 失败:\n%s", out)
+	}
+}
+
+func TestResolveExportOutput(t *testing.T) {
+	tmp := t.TempDir()
+	zipIn := filepath.Join(tmp, "ESfjmffkJN0=.zip")
+	if err := os.WriteFile(zipIn, []byte("PK\x03\x04"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dirIn := filepath.Join(tmp, "world")
+	if err := os.MkdirAll(dirIn, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		in, flag, want string
+	}{
+		{zipIn, "", filepath.Join(tmp, "ESfjmffkJN0=.mcworld")},
+		{zipIn, filepath.Join(tmp, "b", "out"), filepath.Join(tmp, "b", "out.mcworld")},
+		{zipIn, filepath.Join(tmp, "b", "out.mcworld"), filepath.Join(tmp, "b", "out.mcworld")},
+		{dirIn, "", filepath.Join(tmp, "world.mcworld")},
+	}
+	for _, c := range cases {
+		got, err := resolveExportOutput(c.in, c.flag)
+		if err != nil {
+			t.Fatalf("resolveExportOutput(%q,%q): %v", c.in, c.flag, err)
+		}
+		if got != filepath.Clean(c.want) {
+			t.Errorf("resolveExportOutput(%q,%q) = %q, 期望 %q", c.in, c.flag, got, c.want)
+		}
+	}
+}

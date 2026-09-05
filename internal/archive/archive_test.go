@@ -346,3 +346,54 @@ func readAllFile(f *zip.File) ([]byte, error) {
 	defer r.Close()
 	return io.ReadAll(r)
 }
+
+// fakeStore 用于测试 StripWorldRoot 的名称映射与过滤。
+type fakeStore struct{ entries []Entry }
+
+func (f *fakeStore) Kind() string              { return "fake" }
+func (f *fakeStore) Entries() ([]Entry, error) { return f.entries, nil }
+func (f *fakeStore) Open(name string) (io.ReadCloser, error) {
+	return io.NopCloser(strings.NewReader("content-of-" + name)), nil
+}
+func (f *fakeStore) ReadAll(name string) ([]byte, error) {
+	return []byte("content-of-" + name), nil
+}
+
+func TestStripWorldRoot(t *testing.T) {
+	store := &fakeStore{entries: []Entry{
+		{Name: "world/db/CURRENT", Size: 16},
+		{Name: "world/db/", IsDir: true},
+		{Name: "world/level.dat", Size: 32},
+		{Name: "outside.txt", Size: 1},
+	}}
+	stripped, err := StripWorldRoot(store, "world")
+	if err != nil {
+		t.Fatal(err)
+	}
+	es, err := stripped.Entries()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := make([]string, 0, len(es))
+	for _, e := range es {
+		got = append(got, e.Name)
+	}
+	want := []string{"db/", "db/CURRENT", "level.dat"}
+	if len(got) != len(want) {
+		t.Fatalf("剥离后条目 = %v, 期望 %v（world 子树外的 outside.txt 应被过滤）", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("剥离后条目 = %v, 期望 %v", got, want)
+		}
+	}
+	data, err := stripped.ReadAll("db/CURRENT")
+	if err != nil || string(data) != "content-of-world/db/CURRENT" {
+		t.Fatalf("剥离后读取应映射回原始路径: %q, %v", data, err)
+	}
+	// 根级世界原样返回
+	same, err := StripWorldRoot(store, "")
+	if err != nil || same != Store(store) {
+		t.Fatalf("worldRoot 为空应原样返回: %v %v", same, err)
+	}
+}

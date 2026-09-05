@@ -13,6 +13,7 @@
 | `nmcat encrypt` | 加密存档（国际版 → 网易版），默认密钥与官方一致 |
 | `nmcat version` | 读取存档对应的 MC（基岩引擎）真实版本号（≠ App 版本号） |
 | `nmcat info` | 查看存档基本信息：世界名、版本、最后游玩、模式、种子、加密状态等 |
+| `nmcat export` | 解密并导出为 `.mcworld`，国际版我的世界打开即自动导入，无需手动复制目录 |
 
 支持 zip 压缩包与目录两种输入，解密/加密均为流式处理，大存档不会整体载入内存；默认输出到新文件，**不修改输入**。
 
@@ -63,7 +64,18 @@ db 加密:         已加密（2/3 个文件带魔数）
 level.dat:       ESfjmffkJN0=/level.dat
 ```
 
-`version` 与 `info` 对加密存档同样有效（网易加密只作用于 `db/`，`level.dat` 为明文）；两者均支持 `--json` 输出机器可读结果。
+```console
+$ nmcat export 网易存档.zip
+[i] 输入:      网易存档.zip (zip)
+[i] 世界根:    ESfjmffkJN0=（内容已提升到压缩包根）
+[i] 密钥:      88329851（hex 3838333239383531，来源: 自动推导）
+[i] 已解密: 2 个文件
+[✓] 校验:     CURRENT 明文校验通过（MANIFEST-000006）
+[✓] 已导出:   网易存档.mcworld（10 个条目）
+[i] 提示:     将该文件发送到手机后，用国际版我的世界打开即可自动导入
+```
+
+`version` 与 `info` 对加密存档同样有效（网易加密只作用于 `db/`，`level.dat` 为明文），也能直接读取 `.mcworld` 文件；两者均支持 `--json` 输出机器可读结果。
 
 ## 常用参数
 
@@ -121,6 +133,11 @@ go test ./...
 ```
 
 **导入国际版的关键坑——存储位置**：新版国际基岩默认从**应用私有目录**读世界（`/data/user/0/com.mojang.minecraftpe/games/com.mojang/minecraftWorlds`）；放进传统外部路径 `/storage/emulated/0/Android/data/.../minecraftWorlds` 的世界会被隐藏（列表提示"在'设置'中更改存储位置"）。导入时把解密后的世界复制到实际生效的目录，并 `chown -R` 为国际版应用的 uid，否则应用无权读取。
+
+**更优方案：`nmcat export` 导出 `.mcworld` 一键导入**。`.mcworld` 就是"世界目录内容打成的 zip"（level.dat 位于压缩包根），国际版注册了 `VIEW` 意图处理 `*.mcworld`，打开即自动完成导入。两个要点：
+
+- **世界内容必须在压缩包根**——嵌套一层世界子目录（如网易导出 zip 的 `ESfjmffkJN0=/level.dat`）会被新版游戏拒绝导入（Mojira MCPE-19966）。`nmcat export` 会自动把世界内容提升到压缩包根，并对产物做 `level.dat`/`db/CURRENT` 自检。
+- **游戏要能读到该文件**：设备上把 `.mcworld` 放进国际版自己的外部 files 目录（`/storage/emulated/0/Android/data/com.mojang.minecraftpe/files/`）后用文件管理器/`am start` 以 VIEW 方式打开，无需任何存储授权；放在公共 Download 目录则要求先授予"所有文件访问"。导入是静默的，完成后世界列表即出现该世界（已实测：世界列表出现"我的世界"，0.88MB）。
 
 ## 免责声明
 

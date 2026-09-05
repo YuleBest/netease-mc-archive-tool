@@ -28,6 +28,7 @@ func NewRootCmd() *cobra.Command {
 支持对存档（zip 压缩包或目录）进行：
   decrypt   解密网易 XOR 加密存档
   encrypt   加密存档（国际版 → 网易版）
+  export    解密并导出为 .mcworld（国际版一键导入）
   version   读取存档对应的 MC（基岩引擎）版本号
   info      查看存档基本信息
 
@@ -41,7 +42,7 @@ func NewRootCmd() *cobra.Command {
 	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
 		return &UsageError{err}
 	})
-	root.AddCommand(newDecryptCmd(), newEncryptCmd(), newVersionCmd(), newInfoCmd())
+	root.AddCommand(newDecryptCmd(), newEncryptCmd(), newExportCmd(), newVersionCmd(), newInfoCmd())
 	return root
 }
 
