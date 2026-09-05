@@ -218,6 +218,9 @@ func TestExport_RealArchive(t *testing.T) {
 	rootLevelDat := false
 	var current []byte
 	for _, f := range zr.File {
+		if f.Name == "" {
+			t.Fatal("导出产物不应包含空名条目（世界根目录条目剥离后应被跳过）")
+		}
 		switch f.Name {
 		case "level.dat":
 			rootLevelDat = true

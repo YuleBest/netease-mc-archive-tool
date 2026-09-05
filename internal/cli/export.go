@@ -172,6 +172,9 @@ func verifyMcworld(path, manifestName string) error {
 	hasLevelDat := false
 	var current []byte
 	for _, e := range zr.File {
+		if e.Name == "" {
+			return fmt.Errorf("导出产物含空名条目，将导致游戏导入失败")
+		}
 		switch {
 		case e.Name == "level.dat":
 			hasLevelDat = true

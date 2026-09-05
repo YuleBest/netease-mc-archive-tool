@@ -648,6 +648,11 @@ func (s *strippedStore) Entries() ([]Entry, error) {
 			continue
 		}
 		e.Name = strings.TrimPrefix(e.Name, s.prefix)
+		if e.Name == "" {
+			// 世界根目录自身的条目剥离后变空名，写入 zip 会产生非法空名条目，
+			// 导致游戏导入中途失败（实测 MCPE 1.21.120）
+			continue
+		}
 		out = append(out, e)
 	}
 	sortEntries(out)
