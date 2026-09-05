@@ -221,6 +221,32 @@ go test ./...    # 单测 + 集成测试；testdata/ 存有真实加密存档时
 
 发版：推送 `v*` 标签（`git tag -a vX.Y.Z && git push origin vX.Y.Z`），GitHub Actions 会通过 GoReleaser 自动构建上述全部平台并发布 Release——无需手动上传产物。
 
+## 致谢与参考
+
+本工具的算法研究与实现建立在以下开源项目的肩膀上（完整分析见 [docs/encryption.md](docs/encryption.md) §8）：
+
+**网易存档研究**
+
+- [Carbonateds/MCWorld-Converter](https://github.com/Carbonateds/MCWorld-Converter) — P/Invoke 网易官方 `XOREncryptDLL.dll`（仓库附带该 DLL，默认密钥 `88329851` 的出处）
+- [ihaiming/NetEaseMC-Decryptor](https://github.com/ihaiming/NetEaseMC-Decryptor) — 浏览器端一键解密（核心算法源自 [AS5L/AS5L.github.io](https://github.com/AS5L/AS5L.github.io)）
+- [Jerbvsjhs/NeteaseMcDencrypter](https://github.com/Jerbvsjhs/NeteaseMcDencrypter) — Java 跨平台工具，密钥推导实现参考
+- [HTMonkeyG/XOR-MC-Archive-Decrypt](https://github.com/HTMonkeyG/XOR-MC-Archive-Decrypt) — Node.js 工具，最早从 `XOREncrypt.dll` 提取并开源算法
+- [HTMonkeyG/leveldb-mcne](https://github.com/HTMonkeyG/leveldb-mcne) — 支持网易加密的 LevelDB 改版（"除 .log 外均加密"的工程佐证）
+- [Redamancy520/MinecraftWorld-Decryption-Tools](https://github.com/Redamancy520/MinecraftWorld-Decryption-Tools) — 网易 MCStudio 工具链调用官方 DLL 的参考
+
+**格式与规范**
+
+- [Bedrock Edition level format — Minecraft Wiki](https://minecraft.wiki/w/Bedrock_Edition_level_format) — level.dat 与 LevelDB 布局
+- [Mojira MCPE-19966](https://bugs.mojang.com/browse/MCPE-19966) — `.mcworld` 嵌套目录无法导入的官方确认
+- [Bedrock Wiki: File Types](https://wiki.bedrock.dev/documentation/file-types) — `mcworld`/`mcpack`/`mcaddon` 格式定义
+- [google/leveldb](https://github.com/google/leveldb) — `CURRENT`/`MANIFEST`/log 记录帧与 CRC32C 规范
+
+**工具链**
+
+- [charmbracelet/bubbletea](https://github.com/charmbracelet/bubbletea) · [bubbles](https://github.com/charmbracelet/bubbles) · [lipgloss](https://github.com/charmbracelet/lipgloss) — 交互式界面
+- [spf13/cobra](https://github.com/spf13/cobra) — 命令行框架
+- [GoReleaser](https://goreleaser.com) + GitHub Actions — 多平台自动发布
+
 ## 免责声明
 
 本项目仅供学习研究与自己存档的数据迁移使用，请勿用于处理他人存档或任何违反法律法规及《我的世界》相关服务条款的用途。使用本工具造成的任何损失由使用者自行承担。
