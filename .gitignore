@@ -1,0 +1,16 @@
+# ZCode 工作目录
+.zcode/
+
+# 测试用真实存档（个人数据，不入库）
+testdata/*.zip
+
+# nmcat 的默认输出产物
+*_decrypted.zip
+*_encrypted.zip
+*_decrypted/
+*_encrypted/
+
+# Go 构建产物
+nmcat
+dist/
+*.test
