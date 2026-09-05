@@ -14,3 +14,6 @@ testdata/*.zip
 nmcat
 dist/
 *.test
+
+# 实战演练证据（个人数据，不入库）
+e2e-drill/
