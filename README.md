@@ -1,27 +1,34 @@
 # nmcat · netease-mc-archive-tool
 
 [![Release](https://github.com/YuleBest/netease-mc-archive-tool/actions/workflows/release.yml/badge.svg)](https://github.com/YuleBest/netease-mc-archive-tool/actions/workflows/release.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 网易我的世界（中国版）基岩存档命令行工具，使用 Go 实现。
 
-> 解密 / 加密网易加密存档，读取 MC（基岩引擎）真实版本号与世界基本信息。
-> 算法与密钥推导原理的完整研究见 [docs/encryption.md](docs/encryption.md)。
+> 解密 / 加密网易加密存档，一键导出 `.mcworld` 供国际版导入，读取 MC（基岩引擎）真实版本号与世界基本信息。
+> 加密算法与密钥推导原理的完整研究见 [docs/encryption.md](docs/encryption.md)。
 
 ## 功能
 
-| 命令 | 功能 |
-| --- | --- |
-| `nmcat decrypt` | 解密网易 XOR 加密存档（zip 或目录，自动推导密钥） |
-| `nmcat encrypt` | 加密存档（国际版 → 网易版），默认密钥与官方一致 |
-| `nmcat version` | 读取存档对应的 MC（基岩引擎）真实版本号（≠ App 版本号） |
-| `nmcat info` | 查看存档基本信息：世界名、版本、最后游玩、模式、种子、加密状态等 |
-| `nmcat export` | 解密并导出为 `.mcworld`，国际版我的世界打开即自动导入，无需手动复制目录 |
+| 命令 | 别名 | 功能 |
+| --- | --- | --- |
+| `nmcat decrypt` | — | 解密网易 XOR 加密存档（密钥自动推导） |
+| `nmcat encrypt` | — | 加密存档（国际版 → 网易版），默认密钥与官方一致 |
+| `nmcat export` | `mcworld` | 解密并导出为 `.mcworld`，国际版我的世界打开即自动导入 |
+| `nmcat version` | — | 读取存档对应的 MC（基岩引擎）真实版本号（≠ App 版本号） |
+| `nmcat info` | — | 查看存档基本信息：世界名、版本、最后游玩、模式、种子、加密状态等 |
 
-支持 zip 压缩包与目录两种输入，解密/加密均为流式处理，大存档不会整体载入内存；默认输出到新文件，**不修改输入**。
+**通用行为**：
+
+- 输入支持 **zip 压缩包**与**目录**两种形态，按内容自动识别（目录 → 按目录读取；文件头为 `PK` 魔数 → 按 zip 读取），不依赖扩展名；
+- 解密/加密均为流式处理，大存档不会整体载入内存；
+- 默认输出到新文件（`<输入名>_decrypted` / `_encrypted` / `.mcworld`），**不修改输入**；输出与输入同路径会被直接拒绝；
+- 退出码：`0` 成功，`1` 运行时错误（存档无效、旧版加密、密钥错误等），`2` 用法错误；
+- `version` / `info` 支持 `--json` 机器可读输出。
 
 ## 安装
 
-下载预编译版本（推荐）：从 [Releases](https://github.com/YuleBest/netease-mc-archive-tool/releases) 获取对应平台的压缩包——由 GitHub Actions 在推送 `v*` 标签时通过 GoReleaser 自动构建并发布，覆盖 Windows（zip）/ Linux / macOS（tar.gz）/ Android（Termux 可直接运行，arm64）。
+下载预编译版本（推荐）：从 [Releases](https://github.com/YuleBest/netease-mc-archive-tool/releases) 获取对应平台的压缩包，覆盖 Windows（zip）/ Linux / macOS（tar.gz）/ Android（arm64，Termux 与 adb 环境可直接运行）。
 
 ```sh
 # 或用 go install：
@@ -42,6 +49,15 @@ $ nmcat decrypt 网易存档.zip
 [i] 已解密: 2 个文件: CURRENT, MANIFEST-000006
 [✓] 校验:     CURRENT 明文校验通过（MANIFEST-000006）
 [✓] 已写出:   网易存档_decrypted.zip（10 个条目）
+
+$ nmcat export 网易存档.zip
+[i] 输入:      网易存档.zip (zip)
+[i] 世界根:    ESfjmffkJN0=（内容已提升到压缩包根）
+[i] 密钥:      88329851（hex 3838333239383531，来源: 自动推导）
+[i] 已解密: 2 个文件
+[✓] 校验:     CURRENT 明文校验通过（MANIFEST-000006）
+[✓] 已导出:   网易存档.mcworld（10 个条目）
+[i] 提示:     将该文件发送到手机后，用国际版我的世界打开即可自动导入
 
 $ nmcat version 网易存档.zip
 MC 引擎版本:            1.21.120
@@ -69,29 +85,32 @@ db 加密:         已加密（2/3 个文件带魔数）
 level.dat:       ESfjmffkJN0=/level.dat
 ```
 
-```console
-$ nmcat export 网易存档.zip
-[i] 输入:      网易存档.zip (zip)
-[i] 世界根:    ESfjmffkJN0=（内容已提升到压缩包根）
-[i] 密钥:      88329851（hex 3838333239383531，来源: 自动推导）
-[i] 已解密: 2 个文件
-[✓] 校验:     CURRENT 明文校验通过（MANIFEST-000006）
-[✓] 已导出:   网易存档.mcworld（10 个条目）
-[i] 提示:     将该文件发送到手机后，用国际版我的世界打开即可自动导入
-```
+以上均为真实运行输出（样例为 `docs/encryption.md` §6 的验证存档）。`version` / `info` 对加密存档同样有效（网易加密只作用于 `db/`，`level.dat` 为明文），也能直接读取 `.mcworld` 文件。
 
-`version` 与 `info` 对加密存档同样有效（网易加密只作用于 `db/`，`level.dat` 为明文），也能直接读取 `.mcworld` 文件；两者均支持 `--json` 输出机器可读结果。
+## 命令参考
 
-## 常用参数
+### `decrypt` / `encrypt` / `export`（三者参数一致）
 
-```sh
-nmcat decrypt 存档.zip -o 输出.zip          # 指定输出路径
-nmcat decrypt 存档.zip -k 88329851          # 指定密钥（默认按 ASCII；hex: / 0x 前缀表示十六进制）
-nmcat encrypt 存档.zip --overwrite          # 输出已存在时覆盖
-nmcat version 存档目录/ --json              # 机器可读输出
-```
+| 参数 | 说明 |
+| --- | --- |
+| `<input>` | 存档 zip 或目录（自动识别、自动定位 `db/`） |
+| `-o, --output <path>` | 输出路径。默认：decrypt/encrypt 为 `<输入名>_decrypted` / `_encrypted`（zip 输入 → zip，目录输入 → 目录）；export 为 `<输入名>.mcworld` |
+| `-k, --key <key>` | 密钥。**默认按 ASCII 解析**，`hex:` / `0x` 前缀表示十六进制（避免 `88329851` 这类纯数字被误解为 4 字节 hex）。不指定时：decrypt 自动推导，encrypt 用官方默认 `88329851`，export 自动推导 |
+| `--overwrite` | 输出已存在时覆盖（覆盖前会拒绝输出与输入相同的路径） |
 
-**目录与 zip 自动识别**：所有命令的输入既可以是 zip 压缩包，也可以直接是世界目录（游戏在设备上本就以目录形态存放，如 `…/minecraftWorlds/ESfjmffkJN0=`）。识别依据是内容而非扩展名：目录 → 按目录读取，文件头为 `PK` 魔数 → 按 zip 读取。目录输入默认输出到同级的 `<目录名>_decrypted` / `_encrypted`，同样不改动输入；输出路径与输入相同时会直接拒绝，避免误删源存档。
+行为差异：
+
+- `decrypt`：解密 `db/` 内所有带魔数 `80 1D 30 01` 的文件，并对 CURRENT 做已知明文校验；遇到旧版魔数 `90 1D 30 01` 立即报错；
+- `encrypt`：与游戏行为一致，仅加密 `CURRENT` / `MANIFEST-*` / `*.ldb`（`.log` 保持明文），加密后在内存中回读自检；
+- `export`：解密 + 把世界内容提升到压缩包根打包为 `.mcworld`，并对产物做 `level.dat` / `db/CURRENT` 校验。
+
+### `version`
+
+`nmcat version <input> [--json]` —— 优先输出 `InventoryVersion` 字段，其次由 `lastOpenedWithVersion` 数组格式化（如 `[1,21,120,0,0]` → `1.21.120`）。适用于加密存档（`level.dat` 不加密），可用于确认网易存档与哪个国际版引擎版本兼容。
+
+### `info`
+
+`nmcat info <input> [--json]` —— 汇总 `level.dat`（明文 NBT）、`levelname.txt` 与 `db/` 扫描：世界名、引擎版本、最后游玩时间（自动兼容秒/毫秒存储）、游戏模式、难度、生成器、种子、出生点、游戏内时间、文件统计、db 加密状态与密钥可推导性。
 
 ## 加密机制速查
 
@@ -105,44 +124,73 @@ nmcat version 存档目录/ --json              # 机器可读输出
 
 详见 [docs/encryption.md](docs/encryption.md)（含四个开源工具的对比研究与真实存档验证）、[docs/mc-version.md](docs/mc-version.md)（App 版本号 ≠ MC 版本号的调研）。
 
+## 导入国际版指南
+
+nmcat 提供"网易存档 → 国际版可玩"的两种路径，推荐方式一：
+
+### 方式一（推荐）：`nmcat export` 导出 `.mcworld`
+
+```sh
+nmcat export 网易存档.zip      # → 网易存档.mcworld
+```
+
+把 `.mcworld` 传到手机后，用文件管理器选择"用我的世界打开"（或国际版已在后台时点击文件），游戏会自动完成导入。两个要点：
+
+- **世界内容必须在压缩包根**——嵌套一层世界子目录（如网易导出 zip 的 `ESfjmffkJN0=/level.dat`）会被新版游戏拒绝导入（Mojira MCPE-19966）。`nmcat export` 已自动处理，并对产物做自检；
+- **游戏要能读到该文件**：文件放在游戏自有外部目录（`/storage/emulated/0/Android/data/com.mojang.minecraftpe/files/`）或应用可读的任意位置均可；放公共 `Download/` 需先给国际版授予"所有文件访问"权限，否则导入会静默失败。
+
+### 方式二：手动复制解密目录
+
+`nmcat decrypt` 后把解密目录复制进国际版的世界目录。注意**存储位置**：新版国际基岩默认从**应用私有目录**读世界（`/data/user/0/com.mojang.minecraftpe/games/com.mojang/minecraftWorlds`），放进传统外部路径 `/storage/emulated/0/Android/data/.../minecraftWorlds` 的世界会被隐藏（列表提示"在'设置'中更改存储位置"）；且复制后需 `chown -R` 为国际版应用 uid，否则应用无权读取。需要 root（或文件管理器的高级权限）。
+
+### 兼容性
+
+实测网易版 v3.9.15（基岩引擎 1.21.120）的加密世界，解密后在国际版 v1.21.120.4 中世界列表正常识别、可进入游玩（游泳、氧气、死亡等机制均正常）。`nmcat version` 可在迁移前确认两边引擎版本是否一致。
+
+## 实战演练记录
+
+2026-09-06 在真机（PLR110，Android 16，root）完成全链路验证：拉取网易加密世界 → nmcat 解密 → 两种方式导入国际版 → 实机进入世界运行（含 drowned 死亡机制等），logcat 无致命错误。完整记录与截图见 [`e2e-drill/REPORT.md`](e2e-drill/REPORT.md)（个人数据，不入库）。
+
+## 常见问题（FAQ）
+
+**解密报"旧版加密格式"（`90 1D 30 01`）？**
+资源中心二次加密或早期版本使用 AES-CFB8，密钥需调用网易 API，社区目前无法离线解密。
+
+**`info` 显示"密钥: 推导失败"？**
+多为 CURRENT 与 `MANIFEST-*` 序号不匹配、存档损坏，或为资源中心二次加密（CURRENT 长约 80 字节）。可尝试 `decrypt --key 88329851` 直接解。
+
+**导入后世界列表看不到世界？**
+见[导入指南](#导入国际版指南)的存储位置说明——国际版默认只读应用私有目录。
+
+**`.mcworld` 打开后只出现"导入中"提示但没有"导入完成"？**
+导入中途失败了。检查文件是否可被游戏读取（权限），以及是否由旧版工具导出——`nmcat export` 已修复空名 zip 条目导致导入失败的问题（实测 MCPE 1.21.120），请使用最新版本重新导出。
+
+**`最后游玩` 时间看起来不对？**
+不同网易版本对 `LastPlayed` 分别以秒或毫秒存储，nmcat 已自动归一化（< 10¹² 视为秒）。若仍异常请附带 `--json` 输出提 issue。
+
 ## 项目结构
 
 ```
-cmd/nmcat/        入口
-internal/crypt/   XOR 加解密、密钥推导与解析
-internal/archive/ zip/目录统一抽象、db 定位、流式转换
-internal/level/   基岩小端 NBT 读取器、level.dat 解析
-internal/cli/     cobra 子命令
-testdata/         测试存档（不入库）与单测夹具
-docs/             研究文档
+cmd/nmcat/                 入口（go install .../cmd/nmcat 得到 nmcat）
+internal/crypt/            XOR 加解密、密钥推导与解析
+internal/archive/          zip/目录统一抽象、db 定位、流式转换
+internal/level/            基岩小端 NBT 读取器、level.dat 解析
+internal/cli/              cobra 子命令（decrypt/encrypt/export/version/info）
+internal/                  内部测试（含真实存档集成测试）
+testdata/                  测试存档（不入库）与夹具
+docs/                      研究文档（加密机制、版本号调研）
+.github/workflows/         Release 工作流（GoReleaser）
+.goreleaser.yaml           多平台构建配置
+e2e-drill/                 实机演练证据（个人数据，不入库）
 ```
 
-## 测试
+## 测试与发版
 
 ```sh
-go test ./...
+go test ./...    # 单测 + 集成测试；testdata/ 存有真实加密存档时自动追加端到端验证
 ```
 
-单元测试覆盖加解密、密钥推导（含真实样例向量）、NBT 解析与存档转换的往返一致性；若 `testdata/` 下放置了真实网易加密存档 zip，集成测试会额外执行端到端验证（解密 → 再加密 → 与原始逐条目字节比对）。
-
-## 实战演练：解密存档导入国际版实机验证（2026-09-06）
-
-在一台已 root 的真机（PLR110，Android 16）上完成了全链路验证：**网易版 v1.21.120 引擎创建的加密世界，经 nmcat 解密后导入国际版 v1.21.120.4，成功在世界列表识别并进入世界实机运行**。完整记录（含截图与复现命令）见 [`e2e-drill/REPORT.md`](e2e-drill/REPORT.md)（个人数据不入库）。
-
-```text
-① tar 流拉取网易加密世界（不改动原件）
-② nmcat decrypt → 自动推导密钥 88329851，解密 .ldb / CURRENT / MANIFEST 共 3 个文件
-③ 复制进国际版 worlds 目录并 chown 为国际版应用 uid
-④ 启动国际版 → 世界列表出现「我的世界 / 生存 / 3.2MB」→ 点击进入 → 实机运行（游泳、
-   氧气、溺水死亡等机制全部正常），logcat 无致命错误
-```
-
-**导入国际版的关键坑——存储位置**：新版国际基岩默认从**应用私有目录**读世界（`/data/user/0/com.mojang.minecraftpe/games/com.mojang/minecraftWorlds`）；放进传统外部路径 `/storage/emulated/0/Android/data/.../minecraftWorlds` 的世界会被隐藏（列表提示"在'设置'中更改存储位置"）。导入时把解密后的世界复制到实际生效的目录，并 `chown -R` 为国际版应用的 uid，否则应用无权读取。
-
-**更优方案：`nmcat export` 导出 `.mcworld` 一键导入**。`.mcworld` 就是"世界目录内容打成的 zip"（level.dat 位于压缩包根），国际版注册了 `VIEW` 意图处理 `*.mcworld`，打开即自动完成导入。两个要点：
-
-- **世界内容必须在压缩包根**——嵌套一层世界子目录（如网易导出 zip 的 `ESfjmffkJN0=/level.dat`）会被新版游戏拒绝导入（Mojira MCPE-19966）。`nmcat export` 会自动把世界内容提升到压缩包根，并对产物做 `level.dat`/`db/CURRENT` 自检。
-- **游戏要能读到该文件**：设备上把 `.mcworld` 放进国际版自己的外部 files 目录（`/storage/emulated/0/Android/data/com.mojang.minecraftpe/files/`）后用文件管理器/`am start` 以 VIEW 方式打开，无需任何存储授权；放在公共 Download 目录则要求先授予"所有文件访问"。导入是静默的，完成后世界列表即出现该世界（已实测：世界列表出现"我的世界"，0.88MB）。
+发版：推送 `v*` 标签（`git tag -a vX.Y.Z && git push origin vX.Y.Z`），GitHub Actions 会通过 GoReleaser 自动构建上述全部平台并发布 Release——无需手动上传产物。
 
 ## 免责声明
 
