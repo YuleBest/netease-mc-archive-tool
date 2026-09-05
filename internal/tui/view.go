@@ -34,7 +34,11 @@ func (m Model) View() string {
 		return "再见！\n"
 	}
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("nmcat 交互式存档工具") + helpStyle.Render("  v"+m.version) + "\n\n")
+	ver := m.version
+	if ver != "dev" {
+		ver = "v" + strings.TrimPrefix(ver, "v") // 兼容调用方是否自带 v 前缀
+	}
+	b.WriteString(titleStyle.Render("nmcat 交互式存档工具") + helpStyle.Render("  "+ver) + "\n\n")
 
 	switch m.state {
 	case stateInput:
