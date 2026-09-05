@@ -78,7 +78,7 @@ func runTransform(cmd *cobra.Command, input, output, keyFlag string, overwrite b
 		defer closer.Close()
 	}
 
-	outPath, asZip, err := resolveOutput(input, output, suffix)
+	outPath, asZip, err := archive.ResolveOutput(input, output, suffix)
 	if err != nil {
 		return err
 	}
@@ -135,8 +135,8 @@ func runTransform(cmd *cobra.Command, input, output, keyFlag string, overwrite b
 		keySource = "官方默认"
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "[i] 输入:      %s (%s)\n", input, store.Kind())
-	fmt.Fprintf(cmd.OutOrStdout(), "[i] db 目录:   %s\n", displayPrefix(res.DBPrefix))
-	fmt.Fprintf(cmd.OutOrStdout(), "[i] 密钥:      %s（hex %s，来源: %s）\n", formatKeyASCII(res.Key), formatKeyHex(res.Key), keySource)
+	fmt.Fprintf(cmd.OutOrStdout(), "[i] db 目录:   %s\n", archive.DisplayPrefix(res.DBPrefix))
+	fmt.Fprintf(cmd.OutOrStdout(), "[i] 密钥:      %s（hex %s，来源: %s）\n", crypt.FormatKeyASCII(res.Key), crypt.FormatKeyHex(res.Key), keySource)
 	fmt.Fprintf(cmd.OutOrStdout(), "[i] %s: %d 个文件: %s\n", action, len(res.Transformed), strings.Join(res.Transformed, ", "))
 	if len(res.Skipped) > 0 {
 		fmt.Fprintf(cmd.OutOrStdout(), "[i] 已是加密文件，跳过: %s\n", strings.Join(res.Skipped, ", "))
@@ -149,55 +149,4 @@ func runTransform(cmd *cobra.Command, input, output, keyFlag string, overwrite b
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "[✓] 已写出:   %s（%d 个条目）\n", outPath, res.Copied)
 	return nil
-}
-
-// resolveOutput 计算默认输出路径并规范化 -o 参数。
-func resolveOutput(input, flagOut, suffix string) (string, bool, error) {
-	st, err := os.Stat(input)
-	if err != nil {
-		return "", false, err
-	}
-	if st.IsDir() {
-		cleaned := filepath.Clean(input)
-		if flagOut == "" {
-			flagOut = filepath.Join(filepath.Dir(cleaned), filepath.Base(cleaned)+suffix)
-		}
-		return flagOut, false, nil
-	}
-	dir, file := filepath.Split(input)
-	stem := strings.TrimSuffix(file, filepath.Ext(file))
-	if flagOut == "" {
-		return filepath.Join(dir, stem+suffix+".zip"), true, nil
-	}
-	if !strings.HasSuffix(strings.ToLower(flagOut), ".zip") {
-		flagOut += ".zip"
-	}
-	return flagOut, true, nil
-}
-
-// displayPrefix 把空路径前缀显示为 "."（根目录）。
-func displayPrefix(p string) string {
-	if p == "" {
-		return "（存档根目录）"
-	}
-	return p
-}
-
-// formatKeyASCII 将可打印密钥显示为 ASCII，否则显示 <二进制>。
-func formatKeyASCII(key []byte) string {
-	for _, b := range key {
-		if b < 0x20 || b > 0x7E {
-			return "<二进制>"
-		}
-	}
-	return string(key)
-}
-
-func formatKeyHex(key []byte) string {
-	const hexDigits = "0123456789abcdef"
-	out := make([]byte, 0, len(key)*2)
-	for _, b := range key {
-		out = append(out, hexDigits[b>>4], hexDigits[b&0x0F])
-	}
-	return string(out)
 }

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/YuleBest/netease-mc-archive-tool/internal/archive"
+	"github.com/YuleBest/netease-mc-archive-tool/internal/crypt"
 	"github.com/YuleBest/netease-mc-archive-tool/internal/level"
 	"github.com/spf13/cobra"
 )
@@ -130,7 +131,7 @@ func newInfoCmd() *cobra.Command {
 			if out.DBEncrypted && len(st.EncryptedOld) == 0 {
 				if key, err := archive.DeriveKey(store); err == nil {
 					out.KeyDerivable = true
-					out.DerivedKey = formatKeyASCII(key)
+					out.DerivedKey = crypt.FormatKeyASCII(key)
 				}
 			}
 			if asJSON {

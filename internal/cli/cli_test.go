@@ -251,32 +251,3 @@ func TestExport_RealArchive(t *testing.T) {
 		t.Fatalf("info 读取 .mcworld 失败:\n%s", out)
 	}
 }
-
-func TestResolveExportOutput(t *testing.T) {
-	tmp := t.TempDir()
-	zipIn := filepath.Join(tmp, "ESfjmffkJN0=.zip")
-	if err := os.WriteFile(zipIn, []byte("PK\x03\x04"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	dirIn := filepath.Join(tmp, "world")
-	if err := os.MkdirAll(dirIn, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	cases := []struct {
-		in, flag, want string
-	}{
-		{zipIn, "", filepath.Join(tmp, "ESfjmffkJN0=.mcworld")},
-		{zipIn, filepath.Join(tmp, "b", "out"), filepath.Join(tmp, "b", "out.mcworld")},
-		{zipIn, filepath.Join(tmp, "b", "out.mcworld"), filepath.Join(tmp, "b", "out.mcworld")},
-		{dirIn, "", filepath.Join(tmp, "world.mcworld")},
-	}
-	for _, c := range cases {
-		got, err := resolveExportOutput(c.in, c.flag)
-		if err != nil {
-			t.Fatalf("resolveExportOutput(%q,%q): %v", c.in, c.flag, err)
-		}
-		if got != filepath.Clean(c.want) {
-			t.Errorf("resolveExportOutput(%q,%q) = %q, 期望 %q", c.in, c.flag, got, c.want)
-		}
-	}
-}

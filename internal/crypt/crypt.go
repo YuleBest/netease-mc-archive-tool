@@ -210,3 +210,23 @@ func EncryptFile(data, key []byte) ([]byte, error) {
 	out = append(out, XOR(data, key)...)
 	return out, nil
 }
+
+// FormatKeyASCII 将密钥展示为 ASCII 字符串；含不可打印字节时显示 <二进制>。
+func FormatKeyASCII(key []byte) string {
+	for _, b := range key {
+		if b < 0x20 || b > 0x7E {
+			return "<二进制>"
+		}
+	}
+	return string(key)
+}
+
+// FormatKeyHex 返回密钥的小写十六进制形式。
+func FormatKeyHex(key []byte) string {
+	const hexDigits = "0123456789abcdef"
+	out := make([]byte, 0, len(key)*2)
+	for _, b := range key {
+		out = append(out, hexDigits[b>>4], hexDigits[b&0x0F])
+	}
+	return string(out)
+}

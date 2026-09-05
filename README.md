@@ -17,6 +17,7 @@
 | `nmcat export` | `mcworld` | 解密并导出为 `.mcworld`，国际版我的世界打开即自动导入 |
 | `nmcat version` | — | 读取存档对应的 MC（基岩引擎）真实版本号（≠ App 版本号） |
 | `nmcat info` | — | 查看存档基本信息：世界名、版本、最后游玩、模式、种子、加密状态等 |
+| `nmcat tui` | — | **交互式界面**：浏览存档信息，选操作、看进度、出结果，全程按键驱动 |
 
 **通用行为**：
 
@@ -24,7 +25,30 @@
 - 解密/加密均为流式处理，大存档不会整体载入内存；
 - 默认输出到新文件（`<输入名>_decrypted` / `_encrypted` / `.mcworld`），**不修改输入**；输出与输入同路径会被直接拒绝；
 - 退出码：`0` 成功，`1` 运行时错误（存档无效、旧版加密、密钥错误等），`2` 用法错误；
-- `version` / `info` 支持 `--json` 机器可读输出。
+- `version` / `info` 支持 `--json` 机器可读输出；
+- `tui` 需要交互式终端（TTY）：Windows Terminal / 各类 *nix 终端 / Android Termux 均可运行。
+
+## 交互式界面（`nmcat tui`）
+
+```sh
+nmcat tui                      # 进入后输入存档路径
+nmcat tui 网易存档.zip          # 直接打开存档
+```
+
+```text
+┌ nmcat 交互式存档工具 ──────────────┐
+│ 世界        我的世界               │
+│ MC 引擎版本  1.21.120              │
+│ db 加密     已加密（2/3 个文件…）  │
+│ 密钥        可自动推导（88329851） │
+└───────────────────────────────────┘
+  ▸ 解密存档（网易版 → 国际版）
+    加密存档（国际版 → 网易版）
+    导出 .mcworld（国际版一键导入）
+    重新选择存档 / 退出
+```
+
+方向键选操作 → 回车确认（自动算好输出路径，已存在会提示覆盖）→ 进度条实时显示逐文件处理 → 结果页给出校验结论。按键：`↑/↓` 选择、`Enter` 确认、`Esc` 返回、`q`/`Ctrl+C` 退出。
 
 ## 安装
 
@@ -108,6 +132,10 @@ level.dat:       ESfjmffkJN0=/level.dat
 
 `nmcat version <input> [--json]` —— 优先输出 `InventoryVersion` 字段，其次由 `lastOpenedWithVersion` 数组格式化（如 `[1,21,120,0,0]` → `1.21.120`）。适用于加密存档（`level.dat` 不加密），可用于确认网易存档与哪个国际版引擎版本兼容。
 
+### `tui`
+
+`nmcat tui [存档路径]` —— 上述全部能力的交互式封装：加载存档后展示信息面板，列出解密/加密/导出/重选/退出操作，确认时自动计算输出路径并提示覆盖，执行时显示逐文件进度，结束时给出校验结论。基于 [Bubble Tea](https://github.com/charmbracelet/bubbletea)。
+
 ### `info`
 
 `nmcat info <input> [--json]` —— 汇总 `level.dat`（明文 NBT）、`levelname.txt` 与 `db/` 扫描：世界名、引擎版本、最后游玩时间（自动兼容秒/毫秒存储）、游戏模式、难度、生成器、种子、出生点、游戏内时间、文件统计、db 加密状态与密钥可推导性。
@@ -175,7 +203,8 @@ cmd/nmcat/                 入口（go install .../cmd/nmcat 得到 nmcat）
 internal/crypt/            XOR 加解密、密钥推导与解析
 internal/archive/          zip/目录统一抽象、db 定位、流式转换
 internal/level/            基岩小端 NBT 读取器、level.dat 解析
-internal/cli/              cobra 子命令（decrypt/encrypt/export/version/info）
+internal/cli/              cobra 子命令（decrypt/encrypt/export/version/info/tui）
+internal/tui/              交互式界面（Bubble Tea）
 internal/                  内部测试（含真实存档集成测试）
 testdata/                  测试存档（不入库）与夹具
 docs/                      研究文档（加密机制、版本号调研）

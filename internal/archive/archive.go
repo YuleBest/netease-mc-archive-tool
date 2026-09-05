@@ -374,8 +374,11 @@ const (
 // Options 为 Transform 的参数。
 type Options struct {
 	Mode Mode
-	// Key 为加密/解密密钥。解密模式下留空表示自动从 CURRENT+MANIFEST 推导。
+	// Key 为加密/解密密钥。解密模式下留空表示自动从 CURRENT+MANIFEST 推导；
+	// 若存档本身未加密（CURRENT 为明文），则不解密、仅重打包。
 	Key []byte
+	// Progress 可选：每处理完一个条目回调一次（done 从 1 开始，name 为条目基名）。
+	Progress func(done, total int, name string)
 }
 
 // Result 为一次转换的摘要。
@@ -413,6 +416,10 @@ func Transform(store Store, sink Sink, opts Options) (*Result, error) {
 
 	res := &Result{DBPrefix: dbPrefix, Key: opts.Key, KeySource: "指定"}
 	switch {
+	case opts.Mode == ModeDecrypt && len(opts.Key) == 0 && !crypt.IsEncrypted(currentRaw):
+		// 明文存档：无需解密，原样重打包（用于把已解密/国际版存档导出为 .mcworld）
+		res.KeySource = "未加密，无需解密"
+		return transformEntries(store, sink, entries, dbPrefix, opts, res, manifestName)
 	case opts.Mode == ModeDecrypt && len(opts.Key) == 0:
 		key, err := crypt.DeriveKey(currentRaw, manifestName)
 		if err != nil {
@@ -440,10 +447,18 @@ func Transform(store Store, sink Sink, opts Options) (*Result, error) {
 		}
 	}
 
-	for _, e := range entries {
+	return transformEntries(store, sink, entries, dbPrefix, opts, res, manifestName)
+}
+
+// transformEntries 逐条目流式复制/转换并写出。
+func transformEntries(store Store, sink Sink, entries []Entry, dbPrefix string, opts Options, res *Result, manifestName string) (*Result, error) {
+	for i, e := range entries {
 		if e.IsDir {
 			if err := sink.CreateDir(e.Name); err != nil {
 				return nil, err
+			}
+			if opts.Progress != nil {
+				opts.Progress(i+1, len(entries), e.Name)
 			}
 			continue
 		}
@@ -461,12 +476,17 @@ func Transform(store Store, sink Sink, opts Options) (*Result, error) {
 		default:
 			res.Copied++
 		}
+		if opts.Progress != nil {
+			opts.Progress(i+1, len(entries), path.Base(e.Name))
+		}
 	}
 
 	// 解密后：CURRENT 已知明文校验在此处必然已通过（推导或指定密钥时均已验证），
 	// 再对 MANIFEST 做软校验：标准 LevelDB 清单中应含比较器名字符串
 	if opts.Mode == ModeDecrypt {
-		res.Verified = fmt.Sprintf("CURRENT 明文校验通过（%s）", manifestName)
+		if res.KeySource != "未加密，无需解密" {
+			res.Verified = fmt.Sprintf("CURRENT 明文校验通过（%s）", manifestName)
+		}
 		manPath := joinName(dbPrefix, manifestName)
 		if manRaw, err := store.ReadAll(manPath); err == nil && crypt.IsEncrypted(manRaw) {
 			plain := crypt.XOR(manRaw[4:], res.Key)
@@ -665,4 +685,64 @@ func (s *strippedStore) Open(name string) (io.ReadCloser, error) {
 
 func (s *strippedStore) ReadAll(name string) ([]byte, error) {
 	return s.Store.ReadAll(s.prefix + name)
+}
+
+// ---------------------------------------------------------------- 路径解析
+
+// ResolveOutput 计算转换类命令（decrypt/encrypt）的默认输出路径并规范化 -o 参数。
+// suffix 为 "_decrypted" / "_encrypted"；flagOut 为用户显式指定值（可为空）。
+// 返回 (输出路径, 输出是否为 zip, 错误)。
+func ResolveOutput(input, flagOut, suffix string) (string, bool, error) {
+	st, err := os.Stat(input)
+	if err != nil {
+		return "", false, err
+	}
+	if st.IsDir() {
+		cleaned := filepath.Clean(input)
+		if flagOut == "" {
+			flagOut = filepath.Join(filepath.Dir(cleaned), filepath.Base(cleaned)+suffix)
+		}
+		return flagOut, false, nil
+	}
+	dir, file := filepath.Split(input)
+	stem := strings.TrimSuffix(file, filepath.Ext(file))
+	if flagOut == "" {
+		return filepath.Join(dir, stem+suffix+".zip"), true, nil
+	}
+	if !strings.HasSuffix(strings.ToLower(flagOut), ".zip") {
+		flagOut += ".zip"
+	}
+	return flagOut, true, nil
+}
+
+// ResolveExportOutput 计算 export 命令的输出路径并规范化（强制 .mcworld 后缀）。
+func ResolveExportOutput(input, flagOut string) (string, error) {
+	st, err := os.Stat(input)
+	if err != nil {
+		return "", err
+	}
+	if st.IsDir() {
+		cleaned := filepath.Clean(input)
+		if flagOut == "" {
+			flagOut = filepath.Join(filepath.Dir(cleaned), filepath.Base(cleaned)+".mcworld")
+		}
+	} else {
+		dir, file := filepath.Split(input)
+		stem := strings.TrimSuffix(file, filepath.Ext(file))
+		if flagOut == "" {
+			flagOut = filepath.Join(dir, stem+".mcworld")
+		}
+	}
+	if !strings.HasSuffix(strings.ToLower(flagOut), ".mcworld") {
+		flagOut += ".mcworld"
+	}
+	return flagOut, nil
+}
+
+// DisplayPrefix 把空路径前缀显示为“（存档根目录）”。
+func DisplayPrefix(p string) string {
+	if p == "" {
+		return "（存档根目录）"
+	}
+	return p
 }

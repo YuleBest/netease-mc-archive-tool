@@ -31,6 +31,7 @@ func NewRootCmd() *cobra.Command {
   export    解密并导出为 .mcworld（国际版一键导入）
   version   读取存档对应的 MC（基岩引擎）版本号
   info      查看存档基本信息
+  tui       交互式界面（浏览存档、解密/加密/导出）
 
 加密算法与密钥推导原理详见项目内 docs/encryption.md。
 仅供学习研究与个人存档数据迁移使用。`,
@@ -42,7 +43,7 @@ func NewRootCmd() *cobra.Command {
 	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
 		return &UsageError{err}
 	})
-	root.AddCommand(newDecryptCmd(), newEncryptCmd(), newExportCmd(), newVersionCmd(), newInfoCmd())
+	root.AddCommand(newDecryptCmd(), newEncryptCmd(), newExportCmd(), newVersionCmd(), newInfoCmd(), newTUICmd())
 	return root
 }
 

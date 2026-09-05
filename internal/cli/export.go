@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/YuleBest/netease-mc-archive-tool/internal/archive"
 	"github.com/YuleBest/netease-mc-archive-tool/internal/crypt"
@@ -58,7 +57,7 @@ func newExportCmd() *cobra.Command {
 				return err
 			}
 
-			outPath, err := resolveExportOutput(input, output)
+			outPath, err := archive.ResolveExportOutput(input, output)
 			if err != nil {
 				return err
 			}
@@ -113,8 +112,8 @@ func newExportCmd() *cobra.Command {
 			}
 			w := cmd.OutOrStdout()
 			fmt.Fprintf(w, "[i] 输入:      %s (%s)\n", input, store.Kind())
-			fmt.Fprintf(w, "[i] 世界根:    %s（内容已提升到压缩包根）\n", displayPrefix(worldRoot))
-			fmt.Fprintf(w, "[i] 密钥:      %s（hex %s，来源: %s）\n", formatKeyASCII(res.Key), formatKeyHex(res.Key), keySource)
+			fmt.Fprintf(w, "[i] 世界根:    %s（内容已提升到压缩包根）\n", archive.DisplayPrefix(worldRoot))
+			fmt.Fprintf(w, "[i] 密钥:      %s（hex %s，来源: %s）\n", crypt.FormatKeyASCII(res.Key), crypt.FormatKeyHex(res.Key), keySource)
 			fmt.Fprintf(w, "[i] 已解密: %d 个文件\n", len(res.Transformed))
 			if res.Verified != "" {
 				fmt.Fprintf(w, "[✓] 校验:     %s\n", res.Verified)
@@ -128,30 +127,6 @@ func newExportCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&keyFlag, "key", "k", "", "解密密钥（默认自动推导；默认按 ASCII，hex:/0x 前缀表示十六进制）")
 	cmd.Flags().BoolVar(&overwrite, "overwrite", false, "输出已存在时覆盖")
 	return cmd
-}
-
-// resolveExportOutput 计算导出文件默认路径并规范化 -o 参数（强制 .mcworld 后缀）。
-func resolveExportOutput(input, flagOut string) (string, error) {
-	st, err := os.Stat(input)
-	if err != nil {
-		return "", err
-	}
-	if st.IsDir() {
-		cleaned := filepath.Clean(input)
-		if flagOut == "" {
-			flagOut = filepath.Join(filepath.Dir(cleaned), filepath.Base(cleaned)+".mcworld")
-		}
-	} else {
-		dir, file := filepath.Split(input)
-		stem := strings.TrimSuffix(file, filepath.Ext(file))
-		if flagOut == "" {
-			flagOut = filepath.Join(dir, stem+".mcworld")
-		}
-	}
-	if !strings.HasSuffix(strings.ToLower(flagOut), ".mcworld") {
-		flagOut += ".mcworld"
-	}
-	return flagOut, nil
 }
 
 // verifyMcworld 校验导出产物：level.dat 位于压缩包根、db/CURRENT 为明文已知格式。
