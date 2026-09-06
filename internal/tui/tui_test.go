@@ -201,3 +201,34 @@ func TestQuitKeys(t *testing.T) {
 		}
 	}
 }
+
+// TestView_InputScreen_NoRegression 回归测试：空路径进入输入屏时渲染 View，
+// 此前因 bubbles v0.20.0 对 CJK 占位符按显示宽度切片而 panic（slice bounds [:33]）。
+func TestView_InputScreen_NoRegression(t *testing.T) {
+	m := New("", "test") // 无初始路径 → 输入屏
+	if m.state != stateInput {
+		t.Fatalf("状态 = %v, 期望 stateInput", m.state)
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("渲染输入屏 panic: %v", r)
+		}
+	}()
+	if v := m.View(); v == "" {
+		t.Fatal("View 不应为空")
+	}
+}
+
+// TestView_DetailScreen 渲染详情屏（真实存档）。
+func TestView_DetailScreen(t *testing.T) {
+	testArchiveAvailable(t)
+	m := New(testArchive, "test")
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("渲染详情屏 panic: %v", r)
+		}
+	}()
+	if v := m.View(); !bytes.Contains([]byte(v), []byte("1.21.120")) {
+		t.Fatalf("详情屏缺少引擎版本:\n%s", v)
+	}
+}

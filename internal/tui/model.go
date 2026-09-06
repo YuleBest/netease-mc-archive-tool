@@ -96,7 +96,10 @@ func New(initialPath, version string) Model {
 	ti.Placeholder = "输入存档 zip 或目录路径，回车确认"
 	ti.Focus()
 	ti.CharLimit = 512
-	ti.Width = 60
+	// 注意：不要设置 Width。bubbles v0.20.0 的 placeholderView 把占位符的
+	// 「显示宽度」（中文按 2 格计）当作 rune 下标去切片，CJK 占位符 + Width>0
+	// 必然 panic（slice bounds out of range）。Width=0 走整段渲染的安全分支。
+	ti.Width = 0
 	m := Model{
 		version: version,
 		state:   stateInput,
